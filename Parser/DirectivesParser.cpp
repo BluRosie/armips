@@ -42,7 +42,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveOpen(Parser& parser, int flags)
 	{
 		if (!list[1].evaluateString(outputName,false))
 			return nullptr;
-		
+
 		file->initCopy(inputName.path(),outputName.path(),memoryAddress);
 		return file;
 	} else {
@@ -83,7 +83,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveIncbin(Parser& parser, int flag
 	std::vector<Expression> list;
 	if (!parser.parseExpressionList(list,1,3))
 		return nullptr;
-	
+
 	StringLiteral fileName;
 	if (!list[0].evaluateString(fileName,false))
 		return nullptr;
@@ -187,7 +187,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveObjImport(Parser& parser, int f
 
 		return std::make_unique<DirectiveObjImport>(fileName.path(),ctorName);
 	}
-	
+
 	return std::make_unique<DirectiveObjImport>(fileName.path());
 }
 
@@ -220,7 +220,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveConditional(Parser& parser, int
 	case DIRECTIVE_COND_IFDEF:
 		type = ConditionType::IFDEF;
 		if (!parser.parseIdentifier(name))
-			return nullptr;		
+			return nullptr;
 		break;
 	case DIRECTIVE_COND_IFNDEF:
 		type = ConditionType::IFNDEF;
@@ -295,7 +295,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveConditional(Parser& parser, int
 	{
 		return ifBlock;
 	}
-	
+
 	if (condResult == ConditionalResult::False)
 	{
 		if (elseBlock != nullptr)
@@ -359,7 +359,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveData(Parser& parser, int flags)
 	std::vector<Expression> list;
 	if (!parser.parseExpressionList(list,1,-1))
 		return nullptr;
-	
+
 	auto data = std::make_unique<CDirectiveData>();
 	switch (flags & DIRECTIVE_USERMASK)
 	{
@@ -400,7 +400,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveData(Parser& parser, int flags)
 		data->setDouble(list);
 		break;
 	}
-	
+
 	return data;
 }
 
@@ -554,7 +554,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveErrorWarning(Parser& parser, in
 		return nullptr;
 
 	if (stringValue == "on")
-	{	
+	{
 		Logger::setErrorOnWarning(true);
 		return std::make_unique<DummyCommand>();
 	} else if (stringValue == "off")
@@ -573,7 +573,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveRelativeInclude(Parser& parser,
 		return nullptr;
 
 	if (stringValue == "on")
-	{	
+	{
 		Global.relativeInclude = true;
 		return std::make_unique<DummyCommand>();
 	} else if (stringValue == "off")
@@ -592,7 +592,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveNocash(Parser& parser, int flag
 		return nullptr;
 
 	if (stringValue == "on")
-	{	
+	{
 		Global.nocash = true;
 		return std::make_unique<DummyCommand>();
 	} else if (stringValue == "off")
@@ -639,6 +639,31 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveDefineLabel(Parser& parser, int
 	}
 
 	return std::make_unique<CAssemblerLabel>(identifier,Identifier(tok.getOriginalText()),value);
+}
+
+std::unique_ptr<CAssemblerCommand> parseDirectiveEqu(Parser& parser, int flags)
+{
+	const Token& tok = parser.nextToken();
+	if (tok.type != TokenType::Identifier)
+		return nullptr;
+
+	if (parser.nextToken().type != TokenType::Comma)
+		return nullptr;
+
+	Expression value = parser.parseExpression();
+	if (!value.isLoaded())
+		return nullptr;
+
+	const Identifier &identifier = tok.identifierValue();
+	if (!Global.symbolTable.isValidSymbolName(identifier))
+	{
+		parser.printError(tok, "Invalid equ \"%s\"",identifier);
+		return nullptr;
+	}
+	parser.addEquation(tok, identifier, value.toString());
+
+	// hack to convince the framework this directive is doing something that isn't returning a nullptr, actually does nothing because equ is handled above
+	return std::make_unique<ArchitectureCommand>("", "");
 }
 
 std::unique_ptr<CAssemblerCommand> parseDirectiveFunction(Parser& parser, int flags)
@@ -712,7 +737,7 @@ std::unique_ptr<CAssemblerCommand> parseDirectiveInclude(Parser& parser, int fla
 		StringLiteral encodingName;
 		if (!parameters[1].evaluateString(encodingName,true))
 			return nullptr;
-		
+
 		encoding = getEncodingFromString(encodingName.string());
 	}
 
@@ -832,6 +857,7 @@ const DirectiveMap directives = {
 	{ ".sym",             { &parseDirectiveSym,             0 } },
 
 	{ ".definelabel",     { &parseDirectiveDefineLabel,     0 } },
+	{ ".equ",             { &parseDirectiveEqu,             0 } },
 	{ ".function",        { &parseDirectiveFunction,        DIRECTIVE_MANUALSEPARATOR } },
 	{ ".func",            { &parseDirectiveFunction,        DIRECTIVE_MANUALSEPARATOR } },
 
